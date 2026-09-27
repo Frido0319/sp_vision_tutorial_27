@@ -2,7 +2,7 @@
 .github/
 build/
 build-*/
-tests/*.png
+lecture2/homework/tests/*.png
 Camera/
 logs/
 assets/img_with_q/
