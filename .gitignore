@@ -1,6 +1,8 @@
 .vscode/
 .github/
 build/
+build-*/
+tests/*.png
 Camera/
 logs/
 assets/img_with_q/

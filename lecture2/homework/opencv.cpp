@@ -1,27 +1,39 @@
 #include "io/camera.hpp"
-#include "tasks/yolo.hpp"
 #include "opencv2/opencv.hpp"
+#include "tasks/apriltag_detector.hpp"
 #include "tools/img_tools.hpp"
+
+#include <chrono>
+#include <exception>
+#include <iostream>
+#include <string>
 
 int main()
 {
-    // 初始化相机、yolo类
-    
-    // while (1) {
-        // 调用相机读取图像
+  try {
+    io::Camera camera("./configs/camera.yaml");
+    auto_charge::AprilTagDetector detector("./configs/yolo.yaml");
 
+    while (true) {
+      cv::Mat img;
+      std::chrono::steady_clock::time_point timestamp;
+      camera.read(img, timestamp);
 
-        // 调用yolo识别opencv标志
+      const auto detections = detector.detect(img);
+      for (const auto & detection : detections) {
+        const auto green = cv::Scalar(0, 255, 0);
+        tools::draw_points(img, detection.corners, green, 2);
+        tools::draw_text(
+          img, "AprilTag " + std::to_string(detection.id), detection.center, green, 0.7, 2);
+      }
 
-
-
-        // 显示图像
-        // cv::resize(img, img , cv::Size(640, 480));
-        // cv::imshow("img", img);
-        // if (cv::waitKey(0) == 'q') {
-        //     // break;
-        // }
-    // }
-
-    return 0;
+      cv::imshow("OpenCV AprilTag detection", img);
+      const int key = cv::waitKey(1) & 0xFF;
+      if (key == 'q' || key == 27) break;
+    }
+  } catch (const std::exception & error) {
+    std::cerr << "Lecture 2 optional homework failed: " << error.what() << '\n';
+    return 1;
+  }
+  return 0;
 }
