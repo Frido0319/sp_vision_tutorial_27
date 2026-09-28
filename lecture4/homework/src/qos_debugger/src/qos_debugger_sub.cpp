@@ -129,10 +129,18 @@ private:
         "累计: 收到 %u 条, 丢失 %u 条, 丢包率 %.2f%%",
         received_count_, lost_count_, loss_rate);
 
-    /*
-    在这之间加入计算帧率并打印的代码
+    const auto now = std::chrono::steady_clock::now();
+    const double elapsed_seconds =
+        std::chrono::duration<double>(now - last_report_time_).count();
+    const uint32_t received_since_last_report =
+        received_count_ - last_received_count_;
+    const double frame_rate = elapsed_seconds > 0.0
+                                  ? received_since_last_report / elapsed_seconds
+                                  : 0.0;
+    RCLCPP_INFO(this->get_logger(), "接收帧率: %.2f Hz", frame_rate);
 
-    */
+    last_received_count_ = received_count_;
+    last_report_time_ = now;
   }
 
   rclcpp::Subscription<nav_hw_interfaces::msg::SensorData>::SharedPtr subscription_;
