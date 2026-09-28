@@ -1,11 +1,13 @@
 #include "logger.hpp"
 
-#include <fmt/chrono.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 #include <string>
 
 namespace tools
@@ -14,7 +16,13 @@ std::shared_ptr<spdlog::logger> logger_ = nullptr;
 
 void set_logger()
 {
-  auto file_name = fmt::format("logs/{:%Y-%m-%d_%H-%M-%S}.log", std::chrono::system_clock::now());
+  const auto now = std::chrono::system_clock::now();
+  const auto now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm local_time{};
+  localtime_r(&now_time, &local_time);
+  std::ostringstream file_name_stream;
+  file_name_stream << "logs/" << std::put_time(&local_time, "%Y-%m-%d_%H-%M-%S") << ".log";
+  const auto file_name = file_name_stream.str();
   auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(file_name, true);
   file_sink->set_level(spdlog::level::debug);
 

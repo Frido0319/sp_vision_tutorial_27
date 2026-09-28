@@ -68,6 +68,22 @@ class CameraContractTest(unittest.TestCase):
             self.assertIn(function, source)
         self.assertNotIn('#include "io/hikrobot/hikrobot.hpp"', source)
 
+    def test_camera_uses_continuous_acquisition(self) -> None:
+        source = read("io/camera.cpp")
+        open_position = source.index("MV_CC_OpenDevice")
+        trigger_position = source.index('MV_CC_SetEnumValue(handle_, "TriggerMode"')
+        start_position = source.index("MV_CC_StartGrabbing")
+        self.assertLess(open_position, trigger_position)
+        self.assertLess(trigger_position, start_position)
+        self.assertIn("MV_TRIGGER_MODE_OFF", source)
+
+    def test_camera_discards_stale_frames_for_low_latency(self) -> None:
+        source = read("io/camera.cpp")
+        strategy_position = source.index("MV_CC_SetGrabStrategy")
+        start_position = source.index("MV_CC_StartGrabbing")
+        self.assertLess(strategy_position, start_position)
+        self.assertIn("MV_GrabStrategy_LatestImagesOnly", source)
+
 
 class PipelineSourceTest(unittest.TestCase):
     def test_yolo_pipeline_meets_required_visualization(self) -> None:
@@ -124,6 +140,14 @@ class SmokeTestSourceTest(unittest.TestCase):
             "cv::imwrite",
         ]:
             self.assertIn(token, source)
+
+
+class Ubuntu20CompatibilityTest(unittest.TestCase):
+    def test_timestamp_formatting_does_not_require_fmt_chrono_time_point_support(self) -> None:
+        sources = [read("tools/logger.cpp"), read("tasks/yolos/yolov5.cpp")]
+        for source in sources:
+            self.assertNotRegex(source, r'fmt::format\("(?:logs/)?\{:%Y-%m-%d_%H-%M-%S\}')
+            self.assertIn("std::put_time", source)
 
 
 if __name__ == "__main__":

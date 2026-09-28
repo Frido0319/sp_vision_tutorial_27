@@ -74,7 +74,7 @@ source /opt/intel/openvino_2024.6.0/setupvars.sh
 cmake -S . -B build -DBUILD_HOMEWORK_TESTS=ON
 cmake --build build -j"$(nproc)"
 python3 tests/check_homework.py
-ctest --test-dir build --output-on-failure
+(cd build && ctest --output-on-failure)
 ```
 
 ## 4. 运行
@@ -104,7 +104,7 @@ export LD_LIBRARY_PATH="$(pwd)/io/hikrobot/lib/amd64:${LD_LIBRARY_PATH}"
 在 Ubuntu 22.04、GCC 11.4、CMake 3.22、OpenCV 4.5.4、OpenVINO 2024.6 环境中已验证：
 
 - 所有目标 `main`、`opencv`、`example`、`model_smoke` 编译成功。
-- 7 项源代码/接口验收通过。
+- 10 项源代码/接口验收通过。
 - OpenVINO 成功加载 `assets/yolov5.xml` 并完成一帧 CPU 推理。
 - 生成的 AprilTag 36h11、ID 10 被正确识别，并绘制绿色闭合框与文字。
 - 无相机时两个程序会输出清晰错误并以非零状态退出，不会崩溃。

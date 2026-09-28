@@ -1,9 +1,12 @@
 #include "yolov5.hpp"
 
-#include <fmt/chrono.h>
 #include <yaml-cpp/yaml.h>
 
+#include <chrono>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
@@ -246,7 +249,13 @@ void YOLOV5::draw_detections(
 
 void YOLOV5::save(const Armor & armor) const
 {
-  auto file_name = fmt::format("{:%Y-%m-%d_%H-%M-%S}", std::chrono::system_clock::now());
+  const auto now = std::chrono::system_clock::now();
+  const auto now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm local_time{};
+  localtime_r(&now_time, &local_time);
+  std::ostringstream file_name_stream;
+  file_name_stream << std::put_time(&local_time, "%Y-%m-%d_%H-%M-%S");
+  const auto file_name = file_name_stream.str();
   auto img_path = fmt::format("{}/{}_{}.jpg", save_path_, armor.name, file_name);
   cv::imwrite(img_path, tmp_img_);
 }

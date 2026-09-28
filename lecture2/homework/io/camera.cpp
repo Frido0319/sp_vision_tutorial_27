@@ -114,6 +114,12 @@ Camera::Camera(const std::string & config_path)
     require_ok(MV_CC_CreateHandle(&handle_, selected), "MV_CC_CreateHandle");
     require_ok(MV_CC_OpenDevice(handle_), "MV_CC_OpenDevice");
     require_ok(
+      MV_CC_SetEnumValue(handle_, "TriggerMode", MV_TRIGGER_MODE_OFF),
+      "disable trigger mode for continuous acquisition");
+    require_ok(
+      MV_CC_SetGrabStrategy(handle_, MV_GrabStrategy_LatestImagesOnly),
+      "select latest-frame grab strategy");
+    require_ok(
       MV_CC_SetEnumValue(handle_, "BalanceWhiteAuto", MV_BALANCEWHITE_AUTO_CONTINUOUS),
       "set continuous white balance");
     require_ok(
