@@ -54,5 +54,71 @@ ros2 -h     //有忘记的命令就输入-h去查询用法
 
 在下面按顺序完成三个任务，要求把用到的命令放入代码块中并讲解命令，每一问最好加入自己的理解
 
+## 任务一：让 pub 和 sub 能够通信
 
+先分别运行两个节点，再在第三个终端检查话题两端的 QoS：
+
+```bash
+ros2 run qos_debugger qos_debugger_sub
+ros2 run qos_debugger qos_debugger_pub
+ros2 topic info /sensor_data --verbose
+ros2 param get /sensor_publisher reliability
+ros2 param get /sensor_subscriber reliability
+```
+
+`ros2 topic info --verbose` 会显示话题的 publisher 和 subscriber，包括每一端的 reliability、
+history 和 depth。`ros2 param get` 用来再确认节点当前使用的参数值。
+
+原来 publisher 提供 `best_effort`，而 subscriber 请求 `reliable`。订阅端的要求高于发布端
+能提供的保证，ROS2 不会在这两个端点之间建立匹配。我把 publisher 的 `reliability`
+默认值改为 `reliable`，两端现在都使用 Reliable，subscriber 就可以收到 `/sensor_data`。
+
+修改代码后需要重新编译并让当前终端加载新的安装空间：
+
+```bash
+cd lecture4/homework
+colcon build
+source install/setup.bash
+```
+
+## 任务二：定位和修复丢包
+
+用下面的命令可以查看 subscriber 的参数，并在运行中改变回调延时：
+
+```bash
+ros2 param list /sensor_subscriber
+ros2 param get /sensor_subscriber callback_delay_ms
+ros2 param get /sensor_subscriber depth
+ros2 param set /sensor_subscriber callback_delay_ms 30
+ros2 param set /sensor_subscriber callback_delay_ms 0
+```
+
+publisher 默认每秒发布 100 条消息，相邻消息大约间隔 10 ms。原来 subscriber 却在每次
+回调中睡眠 30 ms，单线程 executor 的消费速度跟不上发布速度。在 `KeepLast(depth)`
+的有限历史中，旧消息可能在回调处理前被更新的消息取代，于是序号会出现空缺。
+
+我把 `callback_delay_ms` 的默认值改为 0，正常运行时不再人为拖慢 subscriber。这个参数
+仍然保留，可以用上面的 `ros2 param set` 命令重现慢回调现象。另外，原代码虽然计算了
+每次序号空缺的 `lost`，却没有把它累加到 `lost_count_`，所以丢包率始终不对。
+现在发现正向序号空缺时会执行 `lost_count_ += lost`，每秒输出的累计丢包数和丢包率
+才与收到的序号一致。
+
+## 任务三：计算接收帧率
+
+定时器每次进入 `report()` 时，用当前 `received_count_` 减去上次保存的
+`last_received_count_`，得到这一段时间实际处理的消息数。再用 `steady_clock`
+计算两次报告之间的秒数，帧率为：
+
+```text
+接收帧率 = 本周期新收到的消息数 / 实际经过的秒数
+```
+
+`steady_clock` 只用于测量经过时间，不会因为系统时钟校准而突然跳变。计算完后更新上次
+计数和时间点，下一次定时器就会统计新的一秒区间。运行时会每秒多输出一行：
+
+```text
+接收帧率: 99.50 Hz
+```
+
+这个数值表示 subscriber 实际执行回调的速度，不是 publisher 配置中的标称速度。
 
