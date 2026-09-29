@@ -16,3 +16,10 @@ Lecture5:
 
 -----------
 ##### 注意：本仓库main分支为算法组自瞄方向招新使用，nav分支为算法组导航方向招新使用，请各位同学在进行作业提交等操作时注意区分
+
+## 个人作业提交入口
+
+- Lecture 2 源码：[`lecture2/homework`](lecture2/homework)
+- Lecture 2 构建、运行与验收说明：[`README_HOMEWORK.md`](lecture2/homework/README_HOMEWORK.md)
+- 必做题入口：`lecture2/homework/main.cpp`
+- 附加题入口：`lecture2/homework/opencv.cpp`
