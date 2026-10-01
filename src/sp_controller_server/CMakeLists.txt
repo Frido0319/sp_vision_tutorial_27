@@ -45,6 +45,16 @@ if(BUILD_TESTING)
   ament_add_gtest(test_path_tracker test/test_path_tracker.cpp)
   target_include_directories(test_path_tracker PRIVATE plugins)
   target_link_libraries(test_path_tracker controller_plugins)
+
+  ament_add_gtest(test_pid_plugin test/test_pid_plugin.cpp)
+  target_link_libraries(test_pid_plugin controller_plugins)
+  ament_target_dependencies(test_pid_plugin
+    rclcpp
+    nav_msgs
+    geometry_msgs
+    pluginlib
+    tf2_ros
+  )
 endif()
 
 add_executable(controller_node src/controller_node.cpp)

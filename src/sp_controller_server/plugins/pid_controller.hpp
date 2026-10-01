@@ -1,6 +1,7 @@
 #ifndef PID_CONTROLLER_HPP_
 #define PID_CONTROLLER_HPP_
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -12,6 +13,7 @@
 #include <tf2_ros/buffer.h>
 
 #include "sp_controller_server/controller_plugin.hpp"
+#include "path_tracker.hpp"
 
 namespace pid_controller {
 
@@ -36,6 +38,10 @@ private:
   rclcpp::Node::SharedPtr node_;
   nav_msgs::msg::Path global_plan_;
   std::string base_frame_id_;
+  std::unique_ptr<PathTracker> tracker_;
+  double control_frequency_{0.0};
+  std::chrono::steady_clock::time_point last_step_time_;
+  bool has_last_step_time_{false};
 };
 
 }
