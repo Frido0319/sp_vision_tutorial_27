@@ -1,0 +1,29 @@
+FROM ros:humble-ros-base-jammy
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    libopencv-dev \
+    libyaml-cpp-dev \
+    python3-colcon-common-extensions \
+    python3-pip \
+    python3-rosdep \
+    qtbase5-dev \
+    ros-humble-ament-cmake-gtest \
+    ros-humble-ament-cmake-pytest \
+    ros-humble-behaviortree-cpp-v3 \
+    ros-humble-nav-msgs \
+    ros-humble-pluginlib \
+    ros-humble-rviz2 \
+    ros-humble-std-srvs \
+    ros-humble-tf2-geometry-msgs \
+    ros-humble-tf2-ros \
+    x11-apps \
+    xvfb \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir numpy Pillow pygame PyYAML
+
+WORKDIR /workspace
+CMD ["bash"]
