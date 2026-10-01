@@ -1,7 +1,10 @@
 import os
 
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch import LaunchDescription
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
@@ -11,6 +14,11 @@ def generate_launch_description():
     rviz_config = os.path.join(bringup_share, 'rviz', 'rviz.rviz')
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='true',
+            description='Start RViz2 alongside the navigation stack',
+        ),
         Node(
             package='sp_map_server',
             executable='esdf_map_publisher',
@@ -52,5 +60,6 @@ def generate_launch_description():
             name='rviz2',
             output='screen',
             arguments=['-d', rviz_config],
+            condition=IfCondition(LaunchConfiguration('use_rviz')),
         ),
     ])
