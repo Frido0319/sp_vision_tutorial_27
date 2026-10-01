@@ -45,8 +45,8 @@ LQR and MPC are outside the first release. They add tuning and model risk withou
 - map frame: `map`
 - robot frame: `base_link`
 - velocity command: `/sentry/cmd_vel`
-- planner plugin: `AStar` / `sp_global_planner::AStarPlanner`
-- controller plugin: `PidController` / `pid_controller::PidController`
+- planner plugin instance/type: `AStar` / `sp_global_planner/AStarPlanner`
+- controller plugin instance/type: `PidController` / `PidController`
 - map URI: `sp_nav_bringup/map/maze_map.yaml`
 
 The map safety values will match the supplied simulator unless a bounded experiment proves a safer value: robot radius `0.25 m`, margin `0.05 m`, safe distance `0.70 m`, and ESDF weight `12.0`.
@@ -76,7 +76,7 @@ For each control cycle:
 7. Clamp command magnitude to the configured maximum and clamp command change by the configured acceleration limit.
 8. Publish zero velocity once the final Euclidean distance is within the configured stop tolerance.
 
-The simulator consumes `linear.x` and `linear.y` as planar velocity components. The controller therefore computes both components in the `map` frame. It leaves `angular.z` at zero because the simulated chassis accepts holonomic translation and the assignment scores path tracking rather than heading control.
+The tracker computes feedback in the `map` frame because the supplied controller server provides the pose and measured velocity in that frame. The simulator consumes `/sentry/cmd_vel` as `base_link` planar velocity, so the plugin rotates the final map-frame command into `base_link` with the current pose yaw before returning `TwistStamped`. It leaves `angular.z` at zero because the simulated chassis accepts holonomic translation and the assignment scores path tracking rather than heading control.
 
 ### Safety and failure behavior
 
@@ -127,9 +127,9 @@ A bounded evaluator will start the supplied stack, wait for required nodes and t
 - final goal distance
 - sampled cross-track error to `/global_path`
 - maximum and mean command speed
-- collision or timeout failure
+- timeout and a commanded-but-stationary wall-contact proxy
 
-The final acceptance run also uses the visible RViz and simulator windows. Automated evidence cannot replace visual confirmation that the global costmap, path, robot, and goal are all legible.
+The final acceptance run also uses the visible RViz and simulator windows. The simulator does not publish an authoritative collision topic, so automated stagnation evidence cannot replace visual confirmation that the robot avoids walls and that the global costmap, path, robot, and goal are all legible.
 
 ## Environment strategy
 
