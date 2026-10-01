@@ -18,3 +18,10 @@ Lecture5:
 ##### 注意：本仓库main分支为算法组自瞄方向招新使用，nav分支为算法组导航方向招新使用，请各位同学在进行作业提交等操作时注意区分
 
 ##### 关于大作业代码：final_project_aim分支为自瞄方向大作业 
+
+## Task 1：云台跟随装甲板
+
+`src/task_1.cpp` 完成了相机取帧、云台姿态同步、YOLO 装甲板检测、PnP/solver 解算、AUTO_AIM 模式门控、不开火云台命令和 Plotter 输出。非有限角度、无目标、非自瞄模式或命令超时时均进入禁用零命令。
+
+- [官方要求与验收状态](docs/task1-acceptance.md)
+- [现场调试清单](docs/task1-onsite-checklist.md)
