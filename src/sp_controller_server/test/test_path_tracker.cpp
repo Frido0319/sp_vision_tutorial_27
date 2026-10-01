@@ -46,6 +46,21 @@ TEST(PathTracker, ProgressNeverMovesBackwardWithNoisyPositions)
   }
 }
 
+TEST(PathTracker, ReplanningDoesNotResetAccelerationState)
+{
+  auto replanning_params = params();
+  replanning_params.max_acceleration = 1.0;
+  pid_controller::PathTracker tracker(replanning_params);
+  tracker.setPath({{0.0, 0.0}, {2.0, 0.0}});
+  const auto first = tracker.step({0.0, 0.0}, {0.0, 0.0}, 0.1);
+  ASSERT_NEAR(norm(first.command), 0.1, 1e-9);
+
+  tracker.setPath({{0.0, 0.0}, {2.0, 0.0}});
+  const auto second = tracker.step({0.0, 0.0}, first.command, 0.1);
+  EXPECT_GT(norm(second.command), norm(first.command));
+  EXPECT_LE(norm(second.command) - norm(first.command), 0.1 + 1e-9);
+}
+
 TEST(PathTracker, LimitsSpeedAndAcceleration)
 {
   pid_controller::PathTracker tracker(params());
@@ -78,6 +93,19 @@ TEST(PathTracker, SlowsForCornerAndStopsAtGoal)
   EXPECT_TRUE(stopped.goal_reached);
   EXPECT_DOUBLE_EQ(stopped.command.x, 0.0);
   EXPECT_DOUBLE_EQ(stopped.command.y, 0.0);
+}
+
+TEST(PathTracker, LookaheadDoesNotCutAcrossSharpCorner)
+{
+  auto corner_params = params();
+  corner_params.lookahead_distance = 1.5;
+  corner_params.max_acceleration = 100.0;
+  pid_controller::PathTracker tracker(corner_params);
+  tracker.setPath({{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}});
+
+  const auto output = tracker.step({0.0, 0.0}, {0.0, 0.0}, 0.02);
+  EXPECT_GT(output.command.x, 0.0);
+  EXPECT_NEAR(output.command.y, 0.0, 1e-9);
 }
 
 TEST(PathTracker, InvalidInputsFailSafeToFiniteZero)

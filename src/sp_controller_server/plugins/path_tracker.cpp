@@ -87,7 +87,9 @@ void PathTracker::setPath(std::vector<Point2D> path)
 
   nearest_index_ = 0;
   integral_ = {0.0, 0.0};
-  previous_command_ = {0.0, 0.0};
+  if (path_.empty()) {
+    previous_command_ = {0.0, 0.0};
+  }
 }
 
 TrackerOutput PathTracker::step(
@@ -125,6 +127,25 @@ TrackerOutput PathTracker::step(
   Point2D target = path_[nearest_index_];
   std::size_t target_index = nearest_index_;
   double remaining = params_.lookahead_distance;
+  const auto corner_angle = [this](const std::size_t index) {
+      if (index == 0 || index + 1 >= path_.size()) {
+        return 0.0;
+      }
+      const Velocity2D incoming{
+        path_[index].x - path_[index - 1].x,
+        path_[index].y - path_[index - 1].y};
+      const Velocity2D outgoing{
+        path_[index + 1].x - path_[index].x,
+        path_[index + 1].y - path_[index].y};
+      const double denominator = norm(incoming) * norm(outgoing);
+      if (denominator <= kEpsilon) {
+        return 0.0;
+      }
+      const double cosine = std::clamp(
+        (incoming.x * outgoing.x + incoming.y * outgoing.y) / denominator,
+        -1.0, 1.0);
+      return std::acos(cosine);
+    };
   for (std::size_t index = nearest_index_; index + 1 < path_.size(); ++index) {
     const double segment = distance(path_[index], path_[index + 1]);
     if (segment <= kEpsilon) {
@@ -139,6 +160,15 @@ TrackerOutput PathTracker::step(
       remaining = 0.0;
       break;
     }
+    const std::size_t next_index = index + 1;
+    if (corner_angle(next_index) >= params_.corner_slowdown_angle &&
+      corner_angle(next_index) > kEpsilon)
+    {
+      target = path_[next_index];
+      target_index = next_index;
+      remaining = 0.0;
+      break;
+    }
     remaining -= segment;
     target = path_[index + 1];
     target_index = index + 1;
@@ -148,19 +178,7 @@ TrackerOutput PathTracker::step(
   for (std::size_t index = nearest_index_ + 1;
     index <= target_index && index + 1 < path_.size(); ++index)
   {
-    const Velocity2D incoming{
-      path_[index].x - path_[index - 1].x,
-      path_[index].y - path_[index - 1].y};
-    const Velocity2D outgoing{
-      path_[index + 1].x - path_[index].x,
-      path_[index + 1].y - path_[index].y};
-    const double denominator = norm(incoming) * norm(outgoing);
-    if (denominator <= kEpsilon) {
-      continue;
-    }
-    const double cosine = std::clamp(
-      (incoming.x * outgoing.x + incoming.y * outgoing.y) / denominator, -1.0, 1.0);
-    if (std::acos(cosine) >= params_.corner_slowdown_angle) {
+    if (corner_angle(index) >= params_.corner_slowdown_angle) {
       speed_limit = std::min(speed_limit, params_.max_speed * params_.corner_speed_ratio);
     }
   }
