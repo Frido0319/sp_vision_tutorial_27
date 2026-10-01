@@ -27,6 +27,7 @@ ament_target_dependencies(controller_server_core
 )
 add_library(controller_plugins SHARED
   plugins/pid_controller.cpp
+  plugins/path_tracker.cpp
 )
 target_include_directories(controller_plugins PRIVATE include)
 ament_target_dependencies(controller_plugins
@@ -38,6 +39,14 @@ ament_target_dependencies(controller_plugins
   tf2_geometry_msgs
 )
 pluginlib_export_plugin_description_file(sp_controller_server plugin_description.xml)
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(test_path_tracker test/test_path_tracker.cpp)
+  target_include_directories(test_path_tracker PRIVATE plugins)
+  target_link_libraries(test_path_tracker controller_plugins)
+endif()
+
 add_executable(controller_node src/controller_node.cpp)
 target_link_libraries(controller_node controller_server_core)
 ament_target_dependencies(controller_node rclcpp)
