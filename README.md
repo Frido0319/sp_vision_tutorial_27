@@ -159,6 +159,7 @@ pip3 install --user pygame numpy Pillow
 - 折线累计弧长前视，遇到尖角时把目标截止在角点，避免穿墙切角；
 - 位置误差 PID 与速度前馈，积分限幅、速度矢量限幅和加速度限幅；
 - 拐角和终点减速，空路径、非有限输入和已到达目标时输出零速度；
+- controller server 在里程计超过 `0.30 s` 未更新时立即发布零速度，避免 GUI 卡顿期间沿旧指令继续运动；
 - 将 `map` 系指令根据当前 yaw 旋转到仿真器要求的 `base_link` 系。
 
 详细算法和参数见 [`docs/navigation-controller.md`](docs/navigation-controller.md)。
@@ -205,18 +206,21 @@ bash/nav_dev_container.sh build -- \
 
 ## 10\. 可选图形界面运行
 
-本次自动验收全程为无头模式，不依赖也不启动 RViz2。若之后需要现场目视复核，可在主机允许当前用户访问 X11 后，用一个容器同时运行 RViz2 和仿真器：
+无头自动评测不依赖 RViz2。图形验收可在主机允许当前用户访问 X11 后，用一个容器同时运行 RViz2 和仿真器：
 
 ```bash
 xhost +SI:localuser:"$(id -un)"
 bash/nav_dev_container.sh gui -- bash/run_nav_gui.sh
 ```
 
-在 RViz 中选择 `2D Goal Pose`，对 `(14.1, 14.1)` 发布且只发布一次。配置已开启全局代价地图 `/global_costmap`、全局路径 `/global_path`、TF 机器人位姿和目标工具 `/goal_pose`。关闭任一窗口或在启动终端按 `Ctrl+C` 会清理全部子进程。
+在 RViz 中选择 `2D Goal Pose`，对 `(14.1, 14.1)` 发布且只发布一次。配置已开启全局代价地图 `/global_costmap`、全局路径 `/global_path`、TF 机器人位姿和目标工具 `/goal_pose`。为降低本机图形负载，RViz 固定为 `10 FPS`，没有参与评分的局部代价地图、点云和动态标记默认关闭；仿真器仍完整运行，只把其 Pygame 窗口切换为无界面后端，避免与 RViz 重复绘制。关闭 RViz 或在启动终端按 `Ctrl+C` 会清理全部子进程。
+
+本机最终图形验收使用真实 RViz 点击一次 `(14.096, 14.096)`：导航在 `150.30 s` 内到达，`NavToPose` 返回成功。另一次带 RViz 的自动评测在 `155.553 s` 内到达，终点误差 `0.213 m`、平均横向误差 `0.056 m`，全过程未进入致命代价栅格。
 
 ## 11\. 安全与已知限制
 
 - 控制器不会发布手动 `cmd_vel`；只有 `ControllerPlugin` 通过 controller server 输出速度。
 - 空路径、已到达或非有限输入均返回零速度。
+- controller server 使用 `0.30 s` 里程计新鲜度看门狗；未收到有效里程计或更新超时时持续发布零速度，恢复有效数据后才继续计算控制量。
 - 仿真器没有发布权威碰撞话题；自动“碰墙”判定只是有指令但持续不移动的代理。最终墙面接触仍应以 RViz/仿真 GUI 目视验收为准。
 - `artifacts/`、`build/`、`install/` 和 `log/` 都不进入 Git 历史。

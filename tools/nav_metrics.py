@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import math
-from typing import Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 
 Point = Tuple[float, float]
@@ -16,6 +16,33 @@ def goal_distance(position: Point, goal: Point) -> float:
     if not _finite(position) or not _finite(goal):
         return math.inf
     return math.hypot(position[0] - goal[0], position[1] - goal[1])
+
+
+def grid_cost(
+    position: Point,
+    origin: Point,
+    resolution: float,
+    width: int,
+    height: int,
+    data: Sequence[int],
+) -> Optional[int]:
+    """Return the row-major occupancy cost at a world point, or None if invalid."""
+    if (
+        not _finite(position)
+        or not _finite(origin)
+        or not math.isfinite(resolution)
+        or resolution <= 0.0
+        or width <= 0
+        or height <= 0
+        or len(data) != width * height
+    ):
+        return None
+
+    column = math.floor((position[0] - origin[0]) / resolution)
+    row = math.floor((position[1] - origin[1]) / resolution)
+    if column < 0 or column >= width or row < 0 or row >= height:
+        return None
+    return int(data[row * width + column])
 
 
 def point_to_path_distance(position: Point, path: Sequence[Point]) -> float:

@@ -9,13 +9,13 @@ import statistics
 import time
 
 from geometry_msgs.msg import PoseStamped, Twist
-from nav_msgs.msg import Odometry, Path as NavPath
+from nav_msgs.msg import OccupancyGrid, Odometry, Path as NavPath
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from robot_msg.msg import RobotKinematicsArray
 
-from tools.nav_metrics import goal_distance, point_to_path_distance
+from tools.nav_metrics import goal_distance, grid_cost, point_to_path_distance
 
 
 START = (0.900, 0.900)
@@ -46,6 +46,7 @@ class NavigationEvaluator(Node):
         self.previous_position = None
         self.previous_position_time = None
         self.path = []
+        self.global_costmap = None
         self.latest_command = (0.0, 0.0)
         self.non_finite_command = False
         self.consecutive_goal_samples = 0
@@ -55,9 +56,14 @@ class NavigationEvaluator(Node):
         self.cross_track_samples = []
         self.command_samples = []
         self.odom_samples = 0
+        self.odom_intervals = []
+        self.path_update_count = 0
+        self.max_observed_cost = None
+        self.lethal_cost_samples = 0
 
         self.create_subscription(Odometry, "/Odometry", self._on_odom, 10)
         self.create_subscription(NavPath, "/global_path", self._on_path, 10)
+        self.create_subscription(OccupancyGrid, "/global_costmap", self._on_costmap, 10)
         self.create_subscription(Twist, "/sentry/cmd_vel", self._on_command, 10)
         self.create_subscription(RobotKinematicsArray, "/robots", self._on_robots, 10)
         goal_qos = QoSProfile(
@@ -86,6 +92,8 @@ class NavigationEvaluator(Node):
             return
 
         now = time.monotonic()
+        if self.previous_position_time is not None:
+            self.odom_intervals.append(now - self.previous_position_time)
         self.position = (
             self.odom_origin_world[0] + float(message.pose.pose.position.x),
             self.odom_origin_world[1] + float(message.pose.pose.position.y),
@@ -100,6 +108,24 @@ class NavigationEvaluator(Node):
             error = point_to_path_distance(self.position, self.path)
             if math.isfinite(error):
                 self.cross_track_samples.append(error)
+
+        if self.global_costmap is not None:
+            info = self.global_costmap.info
+            cost = grid_cost(
+                self.position,
+                (float(info.origin.position.x), float(info.origin.position.y)),
+                float(info.resolution),
+                int(info.width),
+                int(info.height),
+                self.global_costmap.data,
+            )
+            if cost is not None:
+                self.max_observed_cost = (
+                    cost if self.max_observed_cost is None else max(self.max_observed_cost, cost)
+                )
+                if cost >= 90:
+                    self.lethal_cost_samples += 1
+                    self.finish(8, f"robot_in_lethal_cost:{cost}")
 
         self._track_stationary_interval(now)
         final_error = goal_distance(self.position, GOAL)
@@ -123,11 +149,15 @@ class NavigationEvaluator(Node):
         )
 
     def _on_path(self, message):
+        self.path_update_count += 1
         self.path = [
             (float(pose.pose.position.x), float(pose.pose.position.y))
             for pose in message.poses
             if math.isfinite(pose.pose.position.x) and math.isfinite(pose.pose.position.y)
         ]
+
+    def _on_costmap(self, message):
+        self.global_costmap = message
 
     def _on_command(self, message):
         command = (float(message.linear.x), float(message.linear.y))
@@ -227,7 +257,14 @@ class NavigationEvaluator(Node):
             "max_commanded_but_stationary_seconds": self.max_stationary_commanded,
             "non_finite_command": self.non_finite_command,
             "odom_samples": self.odom_samples,
+            "mean_odom_interval_seconds": (
+                statistics.fmean(self.odom_intervals) if self.odom_intervals else None
+            ),
+            "max_odom_interval_seconds": max(self.odom_intervals) if self.odom_intervals else None,
             "path_points": len(self.path),
+            "path_update_count": self.path_update_count,
+            "max_observed_global_cost": self.max_observed_cost,
+            "lethal_cost_samples": self.lethal_cost_samples,
         }
         self.output.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.output.with_suffix(self.output.suffix + ".tmp")

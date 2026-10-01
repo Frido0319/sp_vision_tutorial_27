@@ -72,7 +72,8 @@ trap cleanup EXIT INT TERM
 start_group gui-tf.log ros2 run tf2_ros static_transform_publisher \
   0 0.15 0 0 0 0 base_link livox_frame
 sim_params="$(ros2 pkg prefix sp_nav_sim)/share/sp_nav_sim/config/sim_robot.yaml"
-start_group gui-simulator.log ros2 run sp_nav_sim sim_robot --ros-args \
+start_group gui-simulator.log env SDL_VIDEODRIVER=dummy \
+  ros2 run sp_nav_sim sim_robot --ros-args \
   --params-file "$sim_params" -p "pub_hz:=$sim_pub_hz"
 if ! wait_for_odometry; then
   echo "Simulator did not publish /Odometry within 20 seconds." >&2

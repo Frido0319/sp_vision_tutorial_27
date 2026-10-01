@@ -9,7 +9,7 @@
         <SetDouble key="nav_active"           value="1.0"/>
       </Sequence>
       <Sequence>
-        <ForceSuccess>
+        <Fallback>
           <Sequence>
             <NavToPose goal_pose=""
                        goal_pose_stamped="{clicked_point}"/>
@@ -17,9 +17,13 @@
                          is_stop="false"
                          rotate_velocity="3.0"/>
             <GimbalControl mode="0"/>
+            <SetDouble key="nav_active" value="0.0"/>
           </Sequence>
-        </ForceSuccess>
-        <SetDouble key="nav_active" value="0.0"/>
+          <Sequence>
+            <SetDouble key="nav_active" value="0.0"/>
+            <AlwaysFailure/>
+          </Sequence>
+        </Fallback>
       </Sequence>
       <WaitDuration duration="-1"/>
     </ConditionJudge>

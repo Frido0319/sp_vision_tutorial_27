@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -15,6 +16,7 @@
 #include <tf2_ros/transform_listener.h>
 
 #include "sp_controller_server/controller_plugin.hpp"
+#include "sp_controller_server/controller_safety.hpp"
 
 namespace sp_controller_server {
 
@@ -31,6 +33,7 @@ private:
   void onLocalPath(const nav_msgs::msg::Path::SharedPtr msg);
   void onOdometry(const nav_msgs::msg::Odometry::SharedPtr msg);
   void controlLoop();
+  void publishZeroVelocity(const char * reason);
   geometry_msgs::msg::PoseStamped getCurrentPose(const std::string & frame_id);
   void onSetControlEnable(
     const std_srvs::srv::SetBool::Request::SharedPtr request,
@@ -65,6 +68,8 @@ private:
   std::string base_frame_id_;
 
   double control_frequency_{20.0};
+  std::chrono::steady_clock::duration odom_timeout_{};
+  OdometryFreshnessGate odom_freshness_;
 
   std::atomic<bool> control_enabled_{true};
 };

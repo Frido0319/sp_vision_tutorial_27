@@ -149,10 +149,10 @@ void DecisionEngine::run_loop()
     }
 
     if (status == BT::NodeStatus::SUCCESS) {
-      notify("SUCCEEDED – restarting");
+      notify("Tree cycle completed – restarting");
       engine_->halt();
     } else if (status == BT::NodeStatus::FAILURE) {
-      notify("FAILED – restarting");
+      notify("Tree cycle FAILED – restarting");
       engine_->halt();
     }
 

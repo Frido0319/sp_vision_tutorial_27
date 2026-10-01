@@ -55,6 +55,9 @@ if(BUILD_TESTING)
     pluginlib
     tf2_ros
   )
+
+  ament_add_gtest(test_controller_safety test/test_controller_safety.cpp)
+  target_include_directories(test_controller_safety PRIVATE include)
 endif()
 
 add_executable(controller_node src/controller_node.cpp)

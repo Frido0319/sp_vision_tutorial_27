@@ -32,6 +32,7 @@ controller_server:
     cmd_vel_topic: "/sentry/cmd_vel"
     base_frame_id: "base_link"
     control_frequency: 50.0
+    odom_timeout_seconds: 0.30
 
     plugin_name: "PidController"
     plugin_type: "PidController"

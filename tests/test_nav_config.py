@@ -66,6 +66,9 @@ class NavigationConfigTest(unittest.TestCase):
         self.assertEqual(map_params.get("map_yaml"), "sp_nav_bringup/map/maze_map.yaml")
         self.assertGreater(float(map_params.get("publish_rate_hz", 0.0)), 0.0)
         self.assertGreater(float(self.params("controller_server").get("control_frequency", 0.0)), 0.0)
+        odom_timeout = float(self.params("controller_server").get("odom_timeout_seconds", 0.0))
+        self.assertGreater(odom_timeout, 0.0)
+        self.assertLessEqual(odom_timeout, 0.5)
 
     def test_planner_and_controller_parameters_are_complete(self):
         planner = self.params("planner_server").get("AStar", {})

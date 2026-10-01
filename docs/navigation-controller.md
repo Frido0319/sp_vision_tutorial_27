@@ -51,7 +51,13 @@ vy_base = -sin(yaw) * vx_map + cos(yaw) * vy_map
 
 插件测试使用 90° yaw 显式验证该方向和符号。
 
-## 6. 参数
+## 6. Controller server 安全边界
+
+`controller_server` 只在成功取得里程计位姿、TF 和有限速度后刷新里程计时间戳。若启动后尚无有效样本，或最近一次有效样本已超过 `odom_timeout_seconds`，本周期直接发布零速度，不调用控制器插件。空路径、插件未加载、位姿查询失败和控制器异常也都走同一零速度出口。
+
+本作业把 `odom_timeout_seconds` 设为 `0.30 s`。该看门狗位于插件外层，所以即使 RViz 或其他 GUI 竞争 CPU 导致仿真里程计暂时停顿，也不会让底盘继续执行过期速度指令。
+
+## 7. 参数
 
 |Parameter|Value|Purpose|
 |---|---:|---|
@@ -66,7 +72,8 @@ vy_base = -sin(yaw) * vx_map + cos(yaw) * vy_map
 |`corner_speed_ratio`|0.30|拐角速度比例|
 |`goal_slowdown_distance`|1.00 m|终点减速距离|
 |`goal_tolerance`|0.15 m|控制器停车阈值|
+|`odom_timeout_seconds`|0.30 s|controller server 里程计超时零速阈值|
 
-## 7. 测试覆盖
+## 8. 测试覆盖
 
-`test_path_tracker` 覆盖路径所有权与清洗、进度单调性、高频重规划、速度/加速度限幅、拐角减速、不切角、终点停车和非有限输入。`test_pid_plugin` 通过 pluginlib 动态加载 `PidController`，并验证参数、非零跟踪和坐标旋转。
+`test_path_tracker` 覆盖路径所有权与清洗、进度单调性、高频重规划、速度/加速度限幅、拐角减速、不切角、终点停车和非有限输入。`test_pid_plugin` 通过 pluginlib 动态加载 `PidController`，并验证参数、非零跟踪和坐标旋转。`test_controller_safety` 覆盖未收到里程计、阈值内有效和超时失效三种状态。

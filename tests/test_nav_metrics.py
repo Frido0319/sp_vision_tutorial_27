@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from tools.nav_metrics import goal_distance, point_to_path_distance
+from tools.nav_metrics import goal_distance, grid_cost, point_to_path_distance
 
 
 class NavigationMetricsTest(unittest.TestCase):
@@ -34,6 +34,21 @@ class NavigationMetricsTest(unittest.TestCase):
         self.assertTrue(
             math.isinf(point_to_path_distance((math.nan, 0.0), [(0.0, 0.0), (1.0, 0.0)]))
         )
+
+    def test_grid_cost_maps_world_coordinates_to_row_major_cell(self):
+        # 3x2 cells, resolution 0.5, origin (-1.0, 2.0).
+        data = [0, 10, 20, 30, 90, 100]
+        self.assertEqual(
+            grid_cost((-0.25, 2.75), (-1.0, 2.0), 0.5, 3, 2, data),
+            90,
+        )
+
+    def test_grid_cost_rejects_out_of_bounds_and_malformed_grids(self):
+        data = [0, 10, 20, 30]
+        self.assertIsNone(grid_cost((-0.01, 0.25), (0.0, 0.0), 0.5, 2, 2, data))
+        self.assertIsNone(grid_cost((0.25, 1.01), (0.0, 0.0), 0.5, 2, 2, data))
+        self.assertIsNone(grid_cost((0.25, 0.25), (0.0, 0.0), 0.0, 2, 2, data))
+        self.assertIsNone(grid_cost((0.25, 0.25), (0.0, 0.0), 0.5, 3, 2, data))
 
 
 if __name__ == "__main__":

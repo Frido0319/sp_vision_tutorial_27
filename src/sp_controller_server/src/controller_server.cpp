@@ -51,6 +51,7 @@ ControllerServer::ControllerServer()
   plugin_type_      = require_param<std::string>(this, "plugin_type");
   base_frame_id_    = require_param<std::string>(this, "base_frame_id");
   control_frequency_= require_param<double>(this, "control_frequency");
+  const double odom_timeout_seconds = require_param<double>(this, "odom_timeout_seconds");
 
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
@@ -74,6 +75,11 @@ ControllerServer::ControllerServer()
     RCLCPP_WARN(this->get_logger(), "control_frequency must be positive. Resetting to 10 Hz.");
     control_frequency_ = 10.0;
   }
+  if (!std::isfinite(odom_timeout_seconds) || odom_timeout_seconds <= 0.0) {
+    throw std::invalid_argument("odom_timeout_seconds must be finite and positive");
+  }
+  odom_timeout_ = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+    std::chrono::duration<double>(odom_timeout_seconds));
 
   control_timer_ = this->create_wall_timer(
     std::chrono::duration<double>(1.0 / control_frequency_),
@@ -158,6 +164,7 @@ void ControllerServer::onOdometry(const nav_msgs::msg::Odometry::SharedPtr msg)
   }
 
   current_velocity_map_ = vel_map;
+  odom_freshness_.observe(std::chrono::steady_clock::now());
 }
 
 geometry_msgs::msg::PoseStamped ControllerServer::getCurrentPose(const std::string & frame_id)
@@ -188,6 +195,7 @@ void ControllerServer::controlLoop()
   }
 
   if (path_copy.poses.empty()) {
+    publishZeroVelocity("No path available");
     return;
   }
 
@@ -196,7 +204,18 @@ void ControllerServer::controlLoop()
   if (!controller_) {
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
       "Controller plugin not yet available.");
+    publishZeroVelocity("Controller plugin unavailable");
     return;
+  }
+
+  geometry_msgs::msg::Twist current_twist;
+  {
+    std::lock_guard<std::mutex> lock(velocity_mutex_);
+    if (!odom_freshness_.isFresh(std::chrono::steady_clock::now(), odom_timeout_)) {
+      publishZeroVelocity("Odometry stale");
+      return;
+    }
+    current_twist = current_velocity_map_;
   }
 
   geometry_msgs::msg::PoseStamped current_pose;
@@ -205,13 +224,8 @@ void ControllerServer::controlLoop()
   } catch (const tf2::TransformException & e) {
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
       "Failed to get current pose: %s", e.what());
+    publishZeroVelocity("Current pose unavailable");
     return;
-  }
-
-  geometry_msgs::msg::Twist current_twist;
-  {
-    std::lock_guard<std::mutex> lock(velocity_mutex_);
-    current_twist = current_velocity_map_;
   }
 
   geometry_msgs::msg::TwistStamped cmd;
@@ -223,6 +237,7 @@ void ControllerServer::controlLoop()
   } catch (const std::exception & e) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
       "Controller plugin threw exception: %s", e.what());
+    publishZeroVelocity("Controller exception");
     return;
   }
 
@@ -240,11 +255,22 @@ void ControllerServer::controlLoop()
   cmd_vel_pub_->publish(cmd.twist);
 }
 
+void ControllerServer::publishZeroVelocity(const char * reason)
+{
+  cmd_vel_pub_->publish(geometry_msgs::msg::Twist{});
+  RCLCPP_WARN_THROTTLE(
+    this->get_logger(), *this->get_clock(), 2000,
+    "%s, publishing zero velocity.", reason);
+}
+
 void ControllerServer::onSetControlEnable(
   const std_srvs::srv::SetBool::Request::SharedPtr request,
   std_srvs::srv::SetBool::Response::SharedPtr response)
 {
   control_enabled_.store(request->data);
+  if (!request->data) {
+    publishZeroVelocity("Control disabled");
+  }
   response->success = true;
   response->message = request->data ? "Control enabled" : "Control disabled";
   RCLCPP_INFO(this->get_logger(), "%s", response->message.c_str());
