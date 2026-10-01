@@ -12,6 +12,7 @@ from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Odometry, Path as NavPath
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from robot_msg.msg import RobotKinematicsArray
 
 from tools.nav_metrics import goal_distance, point_to_path_distance
@@ -25,11 +26,12 @@ SUCCESS_SAMPLES = 5
 
 
 class NavigationEvaluator(Node):
-    def __init__(self, timeout: float, startup_timeout: float, output: Path):
+    def __init__(self, timeout: float, startup_timeout: float, output: Path, sim_pub_hz: float):
         super().__init__("navigation_evaluator")
         self.timeout = timeout
         self.startup_timeout = startup_timeout
         self.output = output
+        self.sim_pub_hz = sim_pub_hz
         self.started_at = time.monotonic()
         self.goal_started_at = None
         self.goal_publish_count = 0
@@ -58,7 +60,12 @@ class NavigationEvaluator(Node):
         self.create_subscription(NavPath, "/global_path", self._on_path, 10)
         self.create_subscription(Twist, "/sentry/cmd_vel", self._on_command, 10)
         self.create_subscription(RobotKinematicsArray, "/robots", self._on_robots, 10)
-        self.goal_publisher = self.create_publisher(PoseStamped, "/goal_pose", 10)
+        goal_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.goal_publisher = self.create_publisher(PoseStamped, "/goal_pose", goal_qos)
 
     def _on_robots(self, message):
         if self.initial_world is not None:
@@ -154,7 +161,7 @@ class NavigationEvaluator(Node):
         return (
             self.odom_origin_world is not None
             and self.count_publishers("/global_path") > 0
-            and self.count_subscribers("/goal_pose") > 0
+            and self.count_subscribers("/goal_pose") >= 2
             and self.count_subscribers("/sentry/cmd_vel") > 0
         )
 
@@ -204,6 +211,7 @@ class NavigationEvaluator(Node):
             "measured_start": None if self.initial_world is None else list(self.initial_world),
             "goal": list(GOAL),
             "goal_publish_count": self.goal_publish_count,
+            "local_evaluation_sim_pub_hz": self.sim_pub_hz,
             "elapsed_seconds": elapsed,
             "final_error_m": final_error,
             "mean_cross_track_error_m": (
@@ -233,18 +241,28 @@ def parse_args():
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--startup-timeout", type=float, default=45.0)
     parser.add_argument("--output", type=Path, default=Path("artifacts/nav-evaluation.json"))
+    parser.add_argument("--sim-pub-hz", type=float, default=30.0)
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
     rclpy.init()
-    evaluator = NavigationEvaluator(args.timeout, args.startup_timeout, args.output)
+    evaluator = NavigationEvaluator(
+        args.timeout, args.startup_timeout, args.output, args.sim_pub_hz
+    )
+    ready_since = None
     try:
         while rclpy.ok() and not evaluator.finished:
             rclpy.spin_once(evaluator, timeout_sec=0.1)
-            if evaluator.goal_started_at is None and evaluator.ready():
-                evaluator.publish_goal_once()
+            if evaluator.goal_started_at is None:
+                if evaluator.ready():
+                    if ready_since is None:
+                        ready_since = time.monotonic()
+                    elif time.monotonic() - ready_since >= 2.0:
+                        evaluator.publish_goal_once()
+                else:
+                    ready_since = None
             evaluator.check_deadlines()
         evaluator.write_result()
         return evaluator.exit_code

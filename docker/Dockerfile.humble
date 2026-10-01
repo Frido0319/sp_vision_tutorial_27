@@ -23,6 +23,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
   && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get update && apt-get install -y --no-install-recommends python3-opencv \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN pip3 install --no-cache-dir numpy Pillow pygame PyYAML
 
 WORKDIR /workspace

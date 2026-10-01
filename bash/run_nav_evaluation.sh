@@ -4,11 +4,13 @@ set -Eeuo pipefail
 readonly repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 timeout=180
 startup_timeout=45
+sim_pub_hz=10.0
 output="$repo/artifacts/nav-evaluation.json"
 
 usage() {
   cat <<'EOF'
-Usage: bash/run_nav_evaluation.sh [--timeout SECONDS] [--startup-timeout SECONDS] [--output FILE]
+Usage: bash/run_nav_evaluation.sh [--timeout SECONDS] [--startup-timeout SECONDS]
+                                  [--sim-pub-hz HZ] [--output FILE]
 EOF
 }
 
@@ -16,6 +18,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --timeout) timeout="$2"; shift 2 ;;
     --startup-timeout) startup_timeout="$2"; shift 2 ;;
+    --sim-pub-hz) sim_pub_hz="$2"; shift 2 ;;
     --output) output="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -29,9 +32,12 @@ if [[ ! -f "$setup" ]]; then
 fi
 
 mkdir -p "$repo/artifacts"
+set +u
 source "$setup"
+set -u
 export SDL_VIDEODRIVER=dummy
 export PYGAME_HIDE_SUPPORT_PROMPT=1
+export QT_QPA_PLATFORM=offscreen
 export ROS_LOG_DIR="$repo/artifacts/ros-log"
 
 pids=()
@@ -74,11 +80,18 @@ start_group() {
 
 start_group tf.log ros2 run tf2_ros static_transform_publisher \
   0 0.15 0 0 0 0 base_link livox_frame
+sim_params="$(ros2 pkg prefix sp_nav_sim)/share/sp_nav_sim/config/sim_robot.yaml"
+start_group simulator.log ros2 run sp_nav_sim sim_robot --ros-args \
+  --params-file "$sim_params" -p "pub_hz:=$sim_pub_hz"
+if ! timeout 20 ros2 topic echo /Odometry --once >/dev/null 2>&1; then
+  echo "Simulator did not publish /Odometry within 20 seconds." >&2
+  exit 1
+fi
 start_group navigation.log ros2 launch sp_nav_bringup sp_nav.launch.py use_rviz:=false
-start_group simulator.log ros2 launch sp_nav_sim sim_robot.launch.py
 
 cd "$repo"
-python3 tools/evaluate_nav.py \
+python3 -m tools.evaluate_nav \
   --timeout "$timeout" \
   --startup-timeout "$startup_timeout" \
+  --sim-pub-hz "$sim_pub_hz" \
   --output "$output"
