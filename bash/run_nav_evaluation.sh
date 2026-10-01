@@ -78,12 +78,21 @@ start_group() {
   pids+=("$!")
 }
 
+wait_for_odometry() {
+  local deadline=$((SECONDS + 20))
+  while ! ros2 topic list 2>/dev/null | grep -qx '/Odometry'; do
+    (( SECONDS >= deadline )) && return 1
+    sleep 0.2
+  done
+  timeout 5 ros2 topic echo /Odometry --once >/dev/null 2>&1
+}
+
 start_group tf.log ros2 run tf2_ros static_transform_publisher \
   0 0.15 0 0 0 0 base_link livox_frame
 sim_params="$(ros2 pkg prefix sp_nav_sim)/share/sp_nav_sim/config/sim_robot.yaml"
 start_group simulator.log ros2 run sp_nav_sim sim_robot --ros-args \
   --params-file "$sim_params" -p "pub_hz:=$sim_pub_hz"
-if ! timeout 20 ros2 topic echo /Odometry --once >/dev/null 2>&1; then
+if ! wait_for_odometry; then
   echo "Simulator did not publish /Odometry within 20 seconds." >&2
   exit 1
 fi
