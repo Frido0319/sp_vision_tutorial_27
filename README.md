@@ -23,3 +23,5 @@ Lecture5:
 - Lecture 2 构建、运行与验收说明：[`README_HOMEWORK.md`](lecture2/homework/README_HOMEWORK.md)
 - 必做题入口：`lecture2/homework/main.cpp`
 - 附加题入口：`lecture2/homework/opencv.cpp`
+
+##### 关于大作业代码：final_project_aim分支为自瞄方向大作业，final_project_nav为导航方向大作业

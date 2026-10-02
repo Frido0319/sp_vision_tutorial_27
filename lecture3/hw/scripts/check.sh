@@ -8,7 +8,7 @@ echo "=== Homework Check ==="
 cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build -j
 
-ctest --test-dir build --output-on-failure
+(cd build && ctest --output-on-failure)
 
 for workers in 2 3 6; do
   output_dir="test-output/workers-${workers}"
